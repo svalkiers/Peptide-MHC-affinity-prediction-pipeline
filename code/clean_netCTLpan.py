@@ -18,28 +18,6 @@ desired name of your output-file. The output-file of the
 first function can be used as an input for the next. 
 
 """
-
-########################
-#RUN THIS PIECE OF CODE#
-###########|############
-          #V#
-          
-#remove_header('test_results.txt', 'test_results_out.txt')
-#remove_subheaders('test_results_out.txt', 'mytestoutput.txt')
-#remove_empty_lines('mytestoutput.txt', 'mytestresult.txt')
-#replace_spaces('mytestresult.txt', 'my_input_df.txt')
-
-def remove_header(filename_in, filename_out):
-    ''' This function deletes the first 37 lines of
-    a netCTLpan output file, which corresponds to
-    the instructions to run the program in the 
-    terminal. '''
-    fin = open(filename_in, 'r')
-    fin_list = fin.readlines()
-    del fin_list[0:37] #first 37 lines correspond with netCTLpan instructions.
-    fout = open(filename_out, 'w')
-    fout.writelines(fin_list)
-    fout.close
     
 def remove_subheaders(filename_in, filename_out):
     """ This function takes a raw netCTLpan output file as input
@@ -86,4 +64,15 @@ def replace_spaces(filename_in, filename_out):
     with open(filename_out, 'w') as fout:
         for line in lines:
             newline = re.sub(' ', ',', line)
-            fout.write(newline)    
+            fout.write(str(newline).replace(',,', ','))    
+
+
+
+########################
+#RUN THIS PIECE OF CODE#
+###########|############
+          #V#
+
+remove_subheaders('MHC_test_output.txt', 'mytestoutput.txt')
+remove_empty_lines('mytestoutput.txt', 'mytestresult.txt')
+replace_spaces('mytestresult.txt', 'MHC_clean.txt')
