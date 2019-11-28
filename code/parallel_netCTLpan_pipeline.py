@@ -13,6 +13,7 @@ from itertools import product
 from time import sleep
 import subprocess, shlex
 from subprocess import Popen, PIPE
+import re
 
 
 # 2: Parallel exe version (~ number of cores) of netCTLpan
@@ -38,14 +39,14 @@ with open('/home/svalkiers/data_folder/MHC_test_output.txt', 'w') as f:
     pass
 
 
-def execute_netCTLpan(allele, protein, output_suffix, length=9):
+def execute_netCTLpan(allele, protein, length=9):
     
     program = "netCTLpan" + " -a " + str(allele) + " -f " + str(protein) + " -l " + str(length)
 
     p = Popen([program], stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True)     # enter commands in terminal
     output, stderr = p.communicate()
     
-    path_to_output = '/home/svalkiers/data_folder/MHC_test_output_' + output_suffix + '.txt'
+    path_to_output = '/home/svalkiers/data_folder/MHC_test_output.txt'
     with open(path_to_output, 'a') as out:
         out.write(str(output).replace("\\n", "\n"))
 
