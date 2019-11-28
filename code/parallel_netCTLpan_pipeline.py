@@ -51,11 +51,10 @@ def execute_netCTLpan(allele, protein, output_suffix, length=9):
 
     return
 
-# The idea is to loop over the function for each protein, but parallelize for alleles
-# EDIT: this code does not work
+# Parallellize calculations over the number of cores and write output to one file
+# EDIT: this code works
 
-for n, j in prot_list, range(len(prot_list)):
-    results = Parallel(n_jobs=cpu_count())(delayed(execute_netCTLpan)(i, prot_list[n], j) for i in alleles)
+results = Parallel(n_jobs=cpu_count())(delayed(execute_netCTLpan)(i, 'FASTA_example.txt') for i in alleles)
 
 
 # 3: Prepare output for analysis
