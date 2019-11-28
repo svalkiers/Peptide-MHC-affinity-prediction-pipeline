@@ -28,32 +28,34 @@ with open(my_path + 'FASTA_example.txt', 'r') as f:
     
 FASTA_list = []
     
-for char in FASTA.split('>'):
-    FASTA_list.append(char)
+for protein in FASTA.split('>'):
+    FASTA_list.append(protein)
     
 prot_list = FASTA_list[1:]
 
 
 with open('/home/svalkiers/data_folder/MHC_test_output.txt', 'w') as f:
     pass
-    
 
 
-def execute_netCTLpan(allele, protein, length=9):
+def execute_netCTLpan(allele, protein, output_suffix, length=9):
     
     program = "netCTLpan" + " -a " + str(allele) + " -f " + str(protein) + " -l " + str(length)
 
     p = Popen([program], stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True)     # enter commands in terminal
     output, stderr = p.communicate()
     
-    path_to_output = '/home/svalkiers/data_folder/MHC_test_output.txt'
+    path_to_output = '/home/svalkiers/data_folder/MHC_test_output_' + output_suffix + '.txt'
     with open(path_to_output, 'a') as out:
         out.write(str(output).replace("\\n", "\n"))
 
     return
 
+# The idea is to loop over the function for each protein, but parallelize for alleles
+# EDIT: this code does not work
 
-results = Parallel(n_jobs=cpu_count())(delayed(execute_netCTLpan)(i, j) for i, j in (alleles, prot_list))
+for n, j in prot_list, range(len(prot_list)):
+    results = Parallel(n_jobs=cpu_count())(delayed(execute_netCTLpan)(i, prot_list[n], j) for i in alleles)
 
 
 # 3: Prepare output for analysis
