@@ -39,11 +39,16 @@ with open('/home/svalkiers/data_folder/MHC_test_output.txt', 'w') as f:
     pass
 
 
-def execute_netCTLpan(allele, protein, length=9):
-    
-    program = "netCTLpan" + " -a " + str(allele) + " -f " + str(protein) + " -l " + str(length)
+#EDIT: 2 models available
+#    -> 'netMHCpan': netMHCpan version 4.0 (default)
+#    -> 'netCTLpan': netMHCpan version 2.3 + TAP transport efficiency + protease cleavage
 
-    p = Popen([program], stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True)     # enter commands in terminal
+    
+def predict_epitope_affinity(allele, protein, model='netMHCpan', length=9):
+    
+    commands = str(model) + " -a " + str(allele) + " -f " + str(protein) + " -l " + str(length)     # this will be entered in the command line
+
+    p = Popen([commands], stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True)     # enter commands in terminal
     output, stderr = p.communicate()
     
     path_to_output = '/home/svalkiers/data_folder/MHC_test_output.txt'
@@ -55,7 +60,7 @@ def execute_netCTLpan(allele, protein, length=9):
 # Parallellize calculations over the number of cores and write output to one file
 # EDIT: this code works
 
-results = Parallel(n_jobs=cpu_count())(delayed(execute_netCTLpan)(i, 'FASTA_example.txt') for i in alleles)
+results = Parallel(n_jobs=cpu_count())(delayed(predict_epitope_affinity)(i, 'FASTA_example.txt') for i in alleles)
 
 
 # 3: Prepare output for analysis
@@ -68,13 +73,7 @@ def remove_subheaders(filename_in, filename_out):
         lines = f_in.readlines()
     with open(filename_out, 'w') as f_out:
         for line in lines:
-            if line.strip('\n') != '----------------------------------------------------------------------':
-                f_out.write(line) #writes all line w/o ----
-    with open(filename_out, 'r') as f_out:
-        lines = f_out.readlines()
-    with open(filename_out, 'w') as f_out:
-        for line in lines:
-            if 'Number of MHC ligands' not in line.strip('\n') and 'NetCTLpan' not in line.strip('\n') and '#' not in line.strip('\n'):
+            if 'Number of MHC ligands' not in line.strip('\n') and 'NetCTLpan' not in line.strip('\n') and '#' not in line.strip('\n') and '---' not in line.strip('\n') and 'eptide' not in line.strip('\n') and 'Distance' not in line.strip('\n'):
                 f_out.write(line)
                 
 def remove_empty_lines(filename_in, filename_out):
@@ -105,7 +104,7 @@ def replace_spaces(filename_in, filename_out):
     with open(filename_out, 'w') as fout:
         for line in lines:
             newline = re.sub(' ', ',', line)
-            fout.write(str(newline).replace(',,', ',')) 
+            fout.write(str(newline).replace(',,', ','))
             
 remove_subheaders('MHC_test_output.txt', 'MHC_headers.txt')
 remove_empty_lines('MHC_headers.txt', 'MHC_emptylines.txt')
