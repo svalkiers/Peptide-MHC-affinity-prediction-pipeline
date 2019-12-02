@@ -143,7 +143,7 @@ def structure_netMHCpan(filename, path, separator=','):
         immunogenicity_score = df_score.plot(kind='line', x='Index in protein', y='Score', color='red', figsize=(16,12))
         immunogenicity_score.fill_between(x, y-df_score_error, y+df_score_error, color='blue')
         immunogenicity_score.set_title('Immunogenic density plot ' + str(protein), fontsize=30)
-        immunogenicity_score.set_ylabel('MHC score', fontsize=18)
+        immunogenicity_score.set_ylabel('Score', fontsize=18)
         immunogenicity_score.set_xlabel('Index in protein', fontsize=18)
             
         plt.savefig(my_path + 'immunogenic_density_score-' + str(protein) + '.png')
@@ -181,7 +181,7 @@ def structure_netCTLpan(filename, path, separator=','):
     
     my_path = path
     
-    headers = ['Index in protein' ,'Protein', 'Allele', 'Peptide', 'MHC score', 'TAP score', 'Cle score', 'Comb score', '%Rank', 'sign']
+    headers = ['Index in protein' ,'Protein', 'Allele', 'Peptide', 'MHC score', 'TAP score', 'Cle score', 'Comb score', 'Rank', 'sign']
     df = pd.read_csv(filename, sep=separator, 
                      header = 0, 
                      names=headers)
@@ -191,7 +191,53 @@ def structure_netCTLpan(filename, path, separator=','):
     df['Uniprot ID'] = new[1] # Uniprot ID of proteins from which the peptides originate
     df['Protein name'] = new[2] # Canonical name of proteins from which the peptides originate
     df.drop(columns=['Protein', 'sp', 'sign'], inplace=True)
-    return df
+    
+    proteins = df['Uniprot ID'].unique().tolist()
+    proteins.pop()
+    
+    for protein in proteins:
+        
+        df_protein = df['Uniprot ID']==str(protein)
+        new_df = df[df_protein]
+            
+        df_score = new_df.groupby('Index in protein', as_index=False)['Comb score'].mean()
+        x = df_score['Index in protein']
+        y = df_score['Comb score']
+            
+        df_score_stdev = new_df.groupby('Index in protein', as_index=False)['Comb score'].std()
+            
+        df_score['stdev'] = df_score_stdev['Comb score']
+            
+        df_score_error = df_score['stdev']
+            
+        immunogenicity_score = df_score.plot(kind='line', x='Index in protein', y='Comb score', color='red', figsize=(16,12))
+        immunogenicity_score.fill_between(x, y-df_score_error, y+df_score_error, color='blue')
+        immunogenicity_score.set_title('Immunogenic density plot ' + str(protein), fontsize=30)
+        immunogenicity_score.set_ylabel('Score', fontsize=18)
+        immunogenicity_score.set_xlabel('Index in protein', fontsize=18)
+            
+        plt.savefig(my_path + 'immunogenic_density_score-' + str(protein) + '.png')
+            
+        df_rank = new_df.groupby('Index in protein', as_index=False)['Rank'].mean()
+        x = df_rank['Index in protein']
+        y = df_rank['Rank']
+            
+        df_rank_stdev = new_df.groupby('Index in protein', as_index=False)['Rank'].std()
+            
+        df_rank['stdev'] = df_rank_stdev['Rank']
+            
+        df_rank_error = df_rank['stdev']
+            
+        immunogenicity_rank = df_rank.plot(kind='line', x='Index in protein', y='Rank', color='red', figsize=(16,12))
+        immunogenicity_rank.fill_between(x, y-df_rank_error, y+df_rank_error, color='blue')
+        immunogenicity_rank.set_title('Immunogenic density plot ' + str(protein), fontsize=30)
+        immunogenicity_rank.set_ylabel('% Rank', fontsize=18)
+        immunogenicity_rank.set_xlabel('Index in protein', fontsize=18)
+            
+        plt.savefig(my_path + 'immunogenic_density_rank-' + str(protein) + '.png')
+    
+    
+    return
             
  
 #5: run pipeline()
