@@ -23,14 +23,14 @@ import matplotlib.pyplot as plt
 # 2: Parallel exe version (~ number of cores) of prediction models
 
     
-def predict_epitope_affinity(allele, protein, path, model='netMHCpan', length=9):
+def predict_epitope_affinity(allele, protein, mypath, model='netMHCpan', length=9):
     
     commands = str(model) + " -a " + str(allele) + " -f " + str(protein) + " -l " + str(length)     # this will be entered in the command line
 
     p = Popen([commands], stdout=subprocess.PIPE, stdin=subprocess.PIPE, shell=True)     # enter commands in terminal
     output, stderr = p.communicate()
     
-    path_to_output = path + 'AFFINITY.txt'
+    path_to_output = mypath + 'AFFINITY.txt'
     with open(path_to_output, 'a') as out:
         out.write(str(output).replace("\\n", "\n"))
 
@@ -266,4 +266,4 @@ def pipeline(model, path, allele_file, FASTA_file):
     return 
         
         
-pipeline('netMHCpan', '/home/svalkiers/data_folder/', 'HLA_alleles.txt', 'FASTA_example.txt')
+pipeline('netMHCpan', '/home/svalkiers/data_folder/', 'HLA_B_alleles.txt', 'FTLD.fasta.txt')
