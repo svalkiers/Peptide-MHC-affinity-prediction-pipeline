@@ -18,12 +18,14 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy.cluster.hierarchy import linkage, dendrogram
+from scipy.spatial.distance import pdist, squareform
 
 
 # 2: Parallel exe version (~ number of cores) of prediction models
 
     
-def predict_epitope_affinity(allele, protein, mypath, model='netMHCpan', length=9):
+def predict_epitope_affinity(allele, protein, mypath, length, model):
     
     commands = str(model) + " -a " + str(allele) + " -f " + str(protein) + " -l " + str(length)     # this will be entered in the command line
 
@@ -91,7 +93,7 @@ def structure_netMHCpan(filename, path, separator=','):
     
     Parameter description:
     
-    - Pos: Residue number (starting from 0)
+    - Index in protein: Residue number (starting from 0)
     - HLA: Molecule/allele name
     - Peptide: Amino acid sequence of the potential ligand
     - Core: The minimal 9 amino acid binding core directly in contact with the MHC
@@ -101,13 +103,14 @@ def structure_netMHCpan(filename, path, separator=','):
     - Ip: Position of the insertions, if any.
     - Il: Length of the insertion.
     - Icore: Interaction core. This is the sequence of the binding core including eventual insertions of deletions.
-    - Identity: Protein identifier, i.e. the name of the Fasta entry.
+    - Identity: Protein identifier, i.e. the name of the Fasta entry. -> will be split into 'Uniprot ID' and 'Protein name'
     - Score: The raw prediction score
     - Aff(nM): Predicted binding affinity in nanoMolar units (if binding affinity predictions is selected).
-    - %Rank: Rank of the predicted affinity compared to a set of random natural peptides. 
+    - Rank: Rank of the predicted affinity compared to a set of random natural peptides. 
     This measure is not affected by inherent bias of certain molecules towards higher or lower mean predicted affinities. 
     Strong binders are defined as having %rank<0.5, and weak binders with %rank<2. We advise to select candidate binders based on %Rank rather than nM Affinity
-    - BindLevel: (SB: strong binder, WB: weak binder). 
+    
+    BindLevel: (SB: strong binder, WB: weak binder). 
     The peptide will be identified as a strong binder if the % Rank is below the specified threshold for the strong binders, by default 0.5%. 
     The peptide will be identified as a weak binder if the % Rank is above the threshold of the strong binders but below the specified threshold for the weak binders, by default 2%.
     '''
@@ -129,12 +132,56 @@ def structure_netMHCpan(filename, path, separator=','):
         
         df_protein = df['Uniprot ID']==str(protein)
         new_df = df[df_protein]
+        
+        
+        # HLA profile per protein
+        
+        protein_df = new_df[['Index in protein', 'HLA', 'Rank']]
+        protein_df.set_index('Index in protein', inplace=True)
+        
+        pivot_prot = protein_df.pivot_table(values='Rank', index=protein_df.index, columns='HLA', aggfunc='first')
+        pivot_prot.dropna(inplace=True)
+        
+#        alleles = df['HLA'].unique().tolist()
+#        alleles.pop()
+        
+#        for allele in alleles:
+#            pivot_prot[str(allele)] = np.where(pivot_prot[str(allele)] < 5, 1, pivot_prot[str(allele)])
+#            pivot_prot[str(allele)] = np.where(pivot_prot[str(allele)] > 5, 0, pivot_prot[str(allele)])
+        
+        profile = pivot_prot.transpose()
+        
+        # Correlation matrix
+        
+        dm = pd.DataFrame(
+            squareform(pdist(profile.loc[:], 'correlation')),
+            columns = profile.index,
+            index = profile.index
+        )
+        
+        
+        # Heatmap based on correlations
+        
+        fig, ax = plt.subplots(figsize=(14,10))
+        sns.heatmap(dm, xticklabels=dm.columns, yticklabels=dm.columns, cmap=sns.diverging_palette(220, 10, as_cmap=True), ax=ax)
+        plt.title('Pairwise distance between allele affinity for peptides in ' + str(protein), fontsize=30)
+        plt.savefig(path + 'heatmap_' + str(protein))
+        
+        
+        # Clustermap
+        
+        sns.clustermap(profile, method='ward', figsize=(16,12))
+        plt.title('Clustermap ' + str(protein) + ' affinity for HLA alleles', fontsize=30)
+        plt.savefig(path + 'clustermap_' + str(protein))
+        
+
+        # Immunogenic density plot based on score
             
-        df_score = new_df.groupby('Index in protein', as_index=False)['Score'].mean()
+        df_score = new_df.groupby('Index in protein', as_index=False)['Score'].mean()     # Calculate mean of score
         x = df_score['Index in protein']
         y = df_score['Score']
             
-        df_score_stdev = new_df.groupby('Index in protein', as_index=False)['Score'].std()
+        df_score_stdev = new_df.groupby('Index in protein', as_index=False)['Score'].std()     # Calculate standard deviation of rank
             
         df_score['stdev'] = df_score_stdev['Score']
             
@@ -147,12 +194,15 @@ def structure_netMHCpan(filename, path, separator=','):
         immunogenicity_score.set_xlabel('Index in protein', fontsize=18)
             
         plt.savefig(my_path + 'immunogenic_density_score-' + str(protein) + '.png')
+
+
+        # Immunogenic density plot based on rank
             
-        df_rank = new_df.groupby('Index in protein', as_index=False)['Rank'].mean()
+        df_rank = new_df.groupby('Index in protein', as_index=False)['Rank'].mean()     # Calculate mean of rank
         x = df_rank['Index in protein']
         y = df_rank['Rank']
             
-        df_rank_stdev = new_df.groupby('Index in protein', as_index=False)['Rank'].std()
+        df_rank_stdev = new_df.groupby('Index in protein', as_index=False)['Rank'].std()    # Calculate standard deviation of rank
             
         df_rank['stdev'] = df_rank_stdev['Rank']
             
@@ -174,9 +224,22 @@ def structure_netMHCpan(filename, path, separator=','):
 
 def structure_netCTLpan(filename, path, separator=','):
     ''' 
-    Takes a cleaned up netCTLpan file as input.
+        Takes a cleaned up netCTLpan file as input.
     The default separator is a ',' (comma).
     The function returns a cleaned up pandas dataframe.
+    
+    Parameter description:
+
+    - Index in protein: Residue number (starting from 0) 
+    - Protein: Protein identifier. -> will be split into 'Uniprot ID' and 'Protein name'
+    - Allele: HLA allele
+    - Peptide: Peptide sequence
+    - MHC score: MHC Prediction score (in 1-log50K(aff) uniqs)
+    - TAP score: TAP Prediction score
+    - Cle score: Cleavage Prediction score
+    - Comb score: Combined Prediction score
+    - Rank: %Random - %Rank of prediction score to a set of 1000.000 random natural 9mer peptides
+    - sign: Epitope assignment
     '''
     
     my_path = path
@@ -196,15 +259,18 @@ def structure_netCTLpan(filename, path, separator=','):
     proteins.pop()
     
     for protein in proteins:
-        
+
         df_protein = df['Uniprot ID']==str(protein)
         new_df = df[df_protein]
+
+
+        # Immunogenic density plot based on combined score
             
-        df_score = new_df.groupby('Index in protein', as_index=False)['Comb score'].mean()
+        df_score = new_df.groupby('Index in protein', as_index=False)['Comb score'].mean()      # Calculate mean of score
         x = df_score['Index in protein']
         y = df_score['Comb score']
             
-        df_score_stdev = new_df.groupby('Index in protein', as_index=False)['Comb score'].std()
+        df_score_stdev = new_df.groupby('Index in protein', as_index=False)['Comb score'].std()     # Calculate standard deviation of score
             
         df_score['stdev'] = df_score_stdev['Comb score']
             
@@ -217,12 +283,15 @@ def structure_netCTLpan(filename, path, separator=','):
         immunogenicity_score.set_xlabel('Index in protein', fontsize=18)
             
         plt.savefig(my_path + 'immunogenic_density_score-' + str(protein) + '.png')
-            
-        df_rank = new_df.groupby('Index in protein', as_index=False)['Rank'].mean()
+
+
+        # Immunogenic density plot based on rank
+
+        df_rank = new_df.groupby('Index in protein', as_index=False)['Rank'].mean()     # Calculate mean of rank
         x = df_rank['Index in protein']
         y = df_rank['Rank']
             
-        df_rank_stdev = new_df.groupby('Index in protein', as_index=False)['Rank'].std()
+        df_rank_stdev = new_df.groupby('Index in protein', as_index=False)['Rank'].std()     # Calculate standard deviation of rank
             
         df_rank['stdev'] = df_rank_stdev['Rank']
             
@@ -242,15 +311,17 @@ def structure_netCTLpan(filename, path, separator=','):
  
 #5: run pipeline()
            
-def pipeline(model, path, allele_file, FASTA_file):
-    
+def pipeline(model, path, allele_file, FASTA_file, length=9):
+    '''
+    Main function.
+    '''
     my_path = path
     
     with open(path + allele_file, 'r') as alleles:
         alleles = list(map(lambda s: s.strip(), alleles))
     
     
-    Parallel(n_jobs=cpu_count())(delayed(predict_epitope_affinity)(i, FASTA_file, path) for i in alleles)
+    Parallel(n_jobs=cpu_count())(delayed(predict_epitope_affinity)(i, FASTA_file, path, length, model) for i in alleles)
     
     remove_subheaders('AFFINITY.txt', 'subheaders.txt')
     
@@ -266,4 +337,4 @@ def pipeline(model, path, allele_file, FASTA_file):
     return 
         
         
-pipeline('netMHCpan', '/home/svalkiers/data_folder/', 'HLA_B_alleles.txt', 'FTLD.fasta.txt')
+pipeline('netMHCpan', '/home/svalkiers/data_folder/', 'HLA_B_alleles.txt', 'FTLD.fasta.txt')    # Run this function with your variables
